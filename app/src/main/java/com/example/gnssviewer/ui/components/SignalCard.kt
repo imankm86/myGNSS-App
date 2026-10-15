@@ -189,3 +189,4 @@ fun SignalCard(
         }
     }
 }
+

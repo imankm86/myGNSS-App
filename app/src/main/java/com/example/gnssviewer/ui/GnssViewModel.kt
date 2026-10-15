@@ -184,3 +184,4 @@ class GnssViewModel(application: Application) : AndroidViewModel(application) {
         result
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("All" to 0))
 }
+

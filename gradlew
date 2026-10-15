@@ -44,7 +44,7 @@ APP_BASE_NAME=${0##*/}
 APP_HOME=$( cd -P "$( dirname "$app_path" )" && pwd -P ) || exit
 
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+DEFAULT_JVM_OPTS="-Xmx64m -Xms64m"
 
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
@@ -74,6 +74,15 @@ esac
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
+
+# Auto-detect Android Studio bundled JDK if JAVA_HOME is unset
+if [ -z "$JAVA_HOME" ] ; then
+    if [ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ] ; then
+        JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+    elif [ -d "/Applications/Android Studio.app/Contents/jre/Contents/Home" ] ; then
+        JAVA_HOME="/Applications/Android Studio.app/Contents/jre/Contents/Home"
+    fi
+fi
 
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
@@ -130,4 +139,5 @@ for arg do
     shift
 done
 
-exec "$JAVACMD" "$DEFAULT_JVM_OPTS" $JAVA_OPTS $GRADLE_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+

@@ -18,3 +18,4 @@ data class GnssSignal(
     val id: String
         get() = "${constellationType}_${svid}_${carrierFrequencyHz?.toInt() ?: 0}"
 }
+

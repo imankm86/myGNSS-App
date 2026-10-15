@@ -84,3 +84,4 @@ class MockGnssProvider {
         val usedInFix: Boolean
     )
 }
+

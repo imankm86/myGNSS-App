@@ -107,3 +107,4 @@ com.example.gnssviewer/
    - The emulator does not automatically receive live satellite signals unless simulated.
    - Simply toggle the **Demo** switch on the top right to view simulated live GNSS signals across GPS L1/L5, Galileo E1/E5a, GLONASS G1/G2, and BeiDou B1I/B2a!
    - Alternatively, open Emulator Extended Controls (`...` -> **Location**) and load a GPX/KML route.
+
