@@ -2,6 +2,8 @@
 
 A clean, modern Android application written in **Kotlin** and **Jetpack Compose** (Material 3) designed to inspect all visible GNSS signals, their carrier frequencies, and their **Carrier-to-Noise Ratios (C/N₀ in dB-Hz)** with real-time filtering by **constellation** and **frequency band**.
 
+📦 **Direct Download**: Get the pre-compiled APK directly from [`release/app-debug.apk`](release/app-debug.apk).
+
 ---
 
 ## 🌟 Key Features
