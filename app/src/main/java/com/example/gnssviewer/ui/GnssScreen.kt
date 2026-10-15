@@ -1,5 +1,8 @@
 package com.example.gnssviewer.ui
 
+import android.content.Intent
+import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,14 +21,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.GpsNotFixed
+import androidx.compose.material.icons.filled.GpsOff
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material.icons.filled.SensorsOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -42,15 +46,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.gnssviewer.service.ReceiverState
 import com.example.gnssviewer.ui.components.FilterBar
 import com.example.gnssviewer.ui.components.SignalCard
 import com.example.gnssviewer.ui.theme.Amber500
 import com.example.gnssviewer.ui.theme.Emerald500
+import com.example.gnssviewer.ui.theme.Rose500
 import com.example.gnssviewer.ui.theme.Sky500
 import com.example.gnssviewer.ui.theme.Slate400
 
@@ -61,10 +68,13 @@ fun GnssScreen(
     onRequestPermission: () -> Unit
 ) {
     val filterState by viewModel.filterState.collectAsState()
+    val receiverState by viewModel.receiverState.collectAsState()
     val filteredSignals by viewModel.filteredSignals.collectAsState()
     val rawSignals by viewModel.rawSignals.collectAsState()
     val availableConstellations by viewModel.availableConstellations.collectAsState()
     val availableFrequencies by viewModel.availableFrequencies.collectAsState()
+
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -124,6 +134,22 @@ fun GnssScreen(
                 PermissionBanner(onRequestPermission = onRequestPermission)
             }
 
+            // GPS Disabled Banner (if hardware GPS is off in device settings)
+            if (receiverState == ReceiverState.GPS_DISABLED && !filterState.isDemoMode && filterState.hasPermission) {
+                GpsDisabledBanner(
+                    onOpenSettings = {
+                        try {
+                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                        } catch (_: Exception) {}
+                    }
+                )
+            }
+
+            // Hardware Receiver Status Pill (in Live Mode)
+            if (!filterState.isDemoMode && filterState.hasPermission && receiverState != ReceiverState.GPS_DISABLED) {
+                ReceiverStatusHeader(receiverState = receiverState, signalCount = rawSignals.size)
+            }
+
             // Summary Metrics Card
             SummaryHeader(
                 totalSignals = rawSignals.size,
@@ -157,7 +183,13 @@ fun GnssScreen(
                 EmptySignalsView(
                     isDemoMode = filterState.isDemoMode,
                     hasPermission = filterState.hasPermission,
-                    onEnableDemo = { viewModel.toggleDemoMode(true) }
+                    receiverState = receiverState,
+                    onEnableDemo = { viewModel.toggleDemoMode(true) },
+                    onOpenSettings = {
+                        try {
+                            context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                        } catch (_: Exception) {}
+                    }
                 )
             } else {
                 LazyColumn(
@@ -179,6 +211,57 @@ fun GnssScreen(
 }
 
 @Composable
+private fun ReceiverStatusHeader(receiverState: ReceiverState, signalCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        val (color, text) = when (receiverState) {
+            ReceiverState.RECEIVING -> Emerald500 to "GNSS Receiver Active • Tracking $signalCount Signals"
+            ReceiverState.SEARCHING -> Amber500 to "GNSS Receiver Active • Scanning sky for satellites..."
+            ReceiverState.IDLE -> Slate400 to "GNSS Receiver Initializing..."
+            ReceiverState.GPS_DISABLED -> Rose500 to "GPS Provider Disabled in System Settings"
+            ReceiverState.NO_PERMISSION -> Amber500 to "Location Permission Required"
+        }
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(color.copy(alpha = 0.12f))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (receiverState == ReceiverState.SEARCHING) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(10.dp),
+                        strokeWidth = 2.dp,
+                        color = Amber500
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(color)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(
+                    text = text,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = color
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SummaryHeader(
     totalSignals: Int,
     filteredCount: Int,
@@ -188,7 +271,7 @@ private fun SummaryHeader(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
         ),
@@ -197,7 +280,7 @@ private fun SummaryHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -236,7 +319,7 @@ private fun SummaryHeader(
             // Avg C/N0
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = if (averageCn0 != null) String.format(java.util.Locale.US, "%.1f", averageCn0) else "--",
+                    text = if (averageCn0 != null) String.format(Locale.US, "%.1f", averageCn0) else "--",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
@@ -280,13 +363,13 @@ private fun PermissionBanner(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Location Permission Required",
+                    text = "Precise Location Permission Required",
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Grant precise location permission to access GNSS satellite telemetry.",
+                    text = "Ensure 'Precise' (not 'Approximate') location is selected to allow raw GNSS hardware access.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -303,15 +386,67 @@ private fun PermissionBanner(
 }
 
 @Composable
+private fun GpsDisabledBanner(
+    onOpenSettings: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Rose500.copy(alpha = 0.15f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.GpsOff,
+                contentDescription = null,
+                tint = Rose500,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "GPS Provider is Disabled",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Location is turned off in Android system settings. Turn on GPS to receive satellite signals.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = onOpenSettings,
+                colors = ButtonDefaults.buttonColors(containerColor = Rose500)
+            ) {
+                Text("Enable", fontSize = 12.sp, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
 private fun EmptySignalsView(
     isDemoMode: Boolean,
     hasPermission: Boolean,
-    onEnableDemo: () -> Unit
+    receiverState: ReceiverState,
+    onEnableDemo: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(28.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -319,26 +454,31 @@ private fun EmptySignalsView(
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
-                imageVector = Icons.Default.GpsNotFixed,
+                imageVector = if (receiverState == ReceiverState.GPS_DISABLED) Icons.Default.GpsOff else Icons.Default.GpsNotFixed,
                 contentDescription = null,
                 modifier = Modifier.size(56.dp),
-                tint = Slate400
+                tint = if (receiverState == ReceiverState.GPS_DISABLED) Rose500 else Slate400
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "No GNSS Signals Detected",
+                text = if (receiverState == ReceiverState.GPS_DISABLED) "GPS is Turned Off"
+                       else if (receiverState == ReceiverState.SEARCHING) "Scanning Sky for Satellites..."
+                       else "No GNSS Signals Detected",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = if (!hasPermission && !isDemoMode) {
-                    "Location permission is needed to receive satellite signals from the GNSS hardware."
-                } else if (!isDemoMode) {
-                    "Waiting for GNSS satellite lock. Make sure GPS/Location is enabled and you have clear view of the open sky, or turn on Demo Mode."
-                } else {
-                    "No signals match the selected constellation or frequency filters."
+                text = when {
+                    !hasPermission && !isDemoMode ->
+                        "Location permission is needed to receive satellite signals from the GNSS hardware. Please grant Precise Location."
+                    receiverState == ReceiverState.GPS_DISABLED ->
+                        "Location is turned off in device settings. Tap below to turn on Location."
+                    receiverState == ReceiverState.SEARCHING && !isDemoMode ->
+                        "The GPS receiver is actively scanning. If you are indoors, building roofs and concrete walls block satellite radio waves.\n\n• Move near an open window or outdoors for direct sky view.\n• Or switch on Demo Mode to preview all signals."
+                    else ->
+                        "No signals match the selected constellation or frequency filters."
                 },
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
@@ -346,8 +486,16 @@ private fun EmptySignalsView(
                 lineHeight = 18.sp
             )
 
-            if (!isDemoMode) {
-                Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (receiverState == ReceiverState.GPS_DISABLED) {
+                Button(
+                    onClick = onOpenSettings,
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose500)
+                ) {
+                    Text("Open Location Settings")
+                }
+            } else if (!isDemoMode) {
                 Button(
                     onClick = onEnableDemo,
                     colors = ButtonDefaults.buttonColors(containerColor = Sky500)
@@ -360,4 +508,3 @@ private fun EmptySignalsView(
         }
     }
 }
-

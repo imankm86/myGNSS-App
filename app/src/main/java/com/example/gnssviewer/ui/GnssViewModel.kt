@@ -7,6 +7,7 @@ import com.example.gnssviewer.data.GnssSignal
 import com.example.gnssviewer.data.GnssUtils
 import com.example.gnssviewer.service.GnssRepository
 import com.example.gnssviewer.service.MockGnssProvider
+import com.example.gnssviewer.service.ReceiverState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +40,9 @@ class GnssViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _rawSignals = MutableStateFlow<List<GnssSignal>>(emptyList())
     val rawSignals: StateFlow<List<GnssSignal>> = _rawSignals.asStateFlow()
+
+    private val _receiverState = MutableStateFlow(ReceiverState.IDLE)
+    val receiverState: StateFlow<ReceiverState> = _receiverState.asStateFlow()
 
     private val _filterState = MutableStateFlow(
         FilterState(hasPermission = repository.hasLocationPermission())
@@ -81,13 +85,16 @@ class GnssViewModel(application: Application) : AndroidViewModel(application) {
         signalCollectorJob?.cancel()
         signalCollectorJob = viewModelScope.launch {
             if (_filterState.value.isDemoMode) {
+                _receiverState.value = ReceiverState.RECEIVING
                 mockProvider.getSignalsFlow().collect { signals ->
                     _rawSignals.value = signals
                 }
             } else {
                 if (repository.hasLocationPermission()) {
                     try {
-                        repository.getRealGnssSignalsFlow().collect { signals ->
+                        repository.getRealGnssSignalsFlow { state ->
+                            _receiverState.value = state
+                        }.collect { signals ->
                             _rawSignals.value = signals
                         }
                     } catch (e: Exception) {
@@ -95,6 +102,7 @@ class GnssViewModel(application: Application) : AndroidViewModel(application) {
                         _rawSignals.value = emptyList()
                     }
                 } else {
+                    _receiverState.value = ReceiverState.NO_PERMISSION
                     _rawSignals.value = emptyList()
                 }
             }
