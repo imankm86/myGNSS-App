@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">GNSS Signal Viewer</string>
+    <string name="permission_required_title">Location Permission Required</string>
+    <string name="permission_required_desc">Precise location permission is required by Android to access the GNSS hardware and read carrier-to-noise ratios (C/N0) and frequencies.</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="filter_all">All</string>
+</resources>
